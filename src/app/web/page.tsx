@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useApi } from '@/hooks/useApi';
-import PageLayout from '@/components/layout/PageLayout';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 import CustomDataTable from '@/components/common/CustomDataTable';
 import WebsiteModal from '@/components/web/WebsiteModal';
+import { useApi } from '@/hooks/useApi';
 import { API_ENDPOINTS } from '@/config/api';
 import type { Website } from '@/types/website';
 import { TableColumn } from 'react-data-table-component';
@@ -23,10 +25,13 @@ interface FormData {
 }
 
 export default function WebPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [websites, setWebsites] = useState<Website[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
-  const { fetchData, loading } = useApi();
+  const { fetchData, loading: apiLoading } = useApi();
   const [formData, setFormData] = useState<FormData>({
     name: '',
     url: '',
@@ -51,7 +56,7 @@ export default function WebPage() {
         <img 
           src={row.icon || '/placeholder-icon.png'} 
           alt={row.name}
-          className="w-8 h-8 rounded"
+          className="website-icon"
         />
       ),
       width: '80px'
@@ -67,7 +72,8 @@ export default function WebPage() {
         <a href={row.url} target="_blank" rel="noopener noreferrer">
           {row.url}
         </a>
-      )
+      ),
+      sortable: true
     },
     {
       name: 'Status',
@@ -102,9 +108,30 @@ export default function WebPage() {
   ];
 
   useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          setUser(session.user);
+        } else {
+          router.push('/login');
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkUser();
+    
     // Tạm thời dùng mock data
-    setWebsites(mockWebsites);
-  }, []);
+    setWebsites(mockWebsites.map(site => ({
+      ...site,
+      category_id: site.category_id.toString()
+    })));
+  }, [router]);
 
   useEffect(() => {
     if (selectedWebsite) {
@@ -180,28 +207,29 @@ export default function WebPage() {
     }
   };
 
-  const actions = (
-    <button 
-      className="btn btn-primary"
-      onClick={() => {
-        setSelectedWebsite(null);
-        setShowModal(true);
-      }}
-    >
-      <i className="fas fa-plus me-2"></i>
-      Add New Website
-    </button>
-  );
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
-    <PageLayout 
-      title="Website Management"
-      actions={actions}
-    >
+    <DashboardLayout title="Website Management">
+      <div className="mb-4 d-flex justify-content-end">
+        <button 
+          className="btn btn-primary"
+          onClick={() => {
+            setSelectedWebsite(null);
+            setShowModal(true);
+          }}
+        >
+          <i className="fas fa-plus me-2"></i>
+          Add New Website
+        </button>
+      </div>
+      
       <CustomDataTable
         columns={columns}
         data={websites}
-        loading={loading}
+        loading={apiLoading}
         buttons={{
           copy: true,
           csv: true,
@@ -217,6 +245,6 @@ export default function WebPage() {
         onSave={fetchWebsites}
         website={selectedWebsite}
       />
-    </PageLayout>
+    </DashboardLayout>
   );
 } 

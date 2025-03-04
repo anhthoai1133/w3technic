@@ -10,7 +10,7 @@ interface WebsiteModalProps {
   show: boolean;
   onHide: () => void;
   onSave: () => void;
-  website?: Website | null;
+  website: Website | null;
 }
 
 export default function WebsiteModal({
@@ -30,6 +30,7 @@ export default function WebsiteModal({
     is_featured: false
   });
 
+  const [iconFile, setIconFile] = useState<File | null>(null);
   const [categories, setCategories] = useState<any[]>([]); // Initialize as empty array
   const { fetchData, loading } = useApi();
 
@@ -73,18 +74,52 @@ export default function WebsiteModal({
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIconFile(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          icon: reader.result as string
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let iconUrl = formData.icon;
+
+      // Upload icon if new file is selected
+      if (iconFile) {
+        const formData = new FormData();
+        formData.append('file', iconFile);
+        const uploadResponse = await fetchData('/files', {
+          method: 'POST',
+          body: formData
+        });
+        iconUrl = uploadResponse.url;
+      }
+
+      const submitData = {
+        ...formData,
+        icon: iconUrl
+      };
+
       if (website) {
         await fetchData(`${API_ENDPOINTS.websites}/${website.id}`, {
           method: 'PUT',
-          data: formData
+          body: JSON.stringify(submitData)
         });
       } else {
         await fetchData(API_ENDPOINTS.websites, {
           method: 'POST',
-          data: formData
+          body: JSON.stringify(submitData)
         });
       }
       onSave();

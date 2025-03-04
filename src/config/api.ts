@@ -1,16 +1,13 @@
-export const API_BASE_URL = 'https://api.mangaaz.org';
+const API_BASE_URL = process.env.NEXT_PUBLIC_DIRECTUS_URL || 'http://localhost:8055';
+const API_TOKEN = process.env.NEXT_PUBLIC_DIRECTUS_TOKEN || '';
 
 export const API_ENDPOINTS = {
-  websites: '/websites',
-  errors: {
-    list: '/errors',
-    create: '/errors',
-    update: (id: number) => `/errors/${id}`,
-    delete: (id: number) => `/errors/${id}`,
-    search: '/errors/search'
-  },
-  extensions: '/extensions',
-  games: '/games',
-  cloudarcade: '/cloudarcade',
-  categories: '/categories'
-}; 
+  websites: '/items/websites',
+  games: '/items/games',
+  categories: '/items/categories',
+  extensions: '/items/extensions',
+  error_logs: '/items/error_logs',
+  files: '/files'
+};
+
+export { API_BASE_URL, API_TOKEN }; 

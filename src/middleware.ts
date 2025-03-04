@@ -5,33 +5,41 @@ import type { NextRequest } from 'next/server'
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req, res })
-debugger;
-  // Lấy session từ cookie
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  console.log('supabase:',session);
-  console.log('Middleware session:', session)
-  console.log('Current path:', req.nextUrl.pathname)
-  debugger;
+  // Tạm thời bỏ qua middleware để debug
+  return NextResponse.next()
+  try {
+    // Get session
+    const { data: { session } } = await supabase.auth.getSession()
 
-  // Cho phép access static files và API routes
-  if (req.nextUrl.pathname.startsWith('/_next') || 
-      req.nextUrl.pathname.startsWith('/api')) {
+    // Public paths that don't require authentication
+    const publicPaths = ['/login', '/auth/callback']
+    const isPublicPath = publicPaths.some(path => 
+      req.nextUrl.pathname.startsWith(path)
+    )
+
+    // API and static paths
+    const isApiOrStatic = req.nextUrl.pathname.startsWith('/_next') || 
+                         req.nextUrl.pathname.startsWith('/api')
+
+    if (isApiOrStatic) {
+      return res
+    }
+
+    // Redirect rules
+    if (!session && !isPublicPath) {
+      // Not logged in, trying to access protected route
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
+
+    if (session && isPublicPath) {
+      // Logged in, trying to access public route
+      return NextResponse.redirect(new URL('/web', req.url))
+    }
+
+  } catch (error) {
+    console.error('Middleware error:', error)
+    // On error, allow request to continue
     return res
-  }
-
-  // Nếu đã login mà vào trang login -> redirect to /web
-  debugger;
-  if (session && req.nextUrl.pathname === '/login') {
-    return NextResponse.redirect(new URL('/web', req.url))
-  }
-
-  // Nếu chưa login và không phải trang login/callback -> redirect to login
-  if (!session && 
-      !req.nextUrl.pathname.startsWith('/login') && 
-      !req.nextUrl.pathname.startsWith('/auth/callback')) {
-    return NextResponse.redirect(new URL('/login', req.url))
   }
 
   return res

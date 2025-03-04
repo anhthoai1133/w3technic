@@ -1,32 +1,35 @@
 'use client'
 
-import Sidebar from "@/components/Sidebar"
-import Header from "@/components/Header"
-import { useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 export default function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      console.log('Protected layout session:', session)
+      
+      if (!session) {
+        router.replace('/login')
+        return
+      }
+      
+      setIsLoading(false)
     }
+    
     checkSession()
-  }, [])
+  }, [router])
 
-  return (
-    <div className="min-h-screen">
-      <div className="flex">
-        <Sidebar />
-        <main className="flex-1 p-6">
-          <Header />
-          {children}
-        </main>
-      </div>
-    </div>
-  )
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  }
+
+  return <>{children}</>
 }

@@ -9,8 +9,8 @@ import type { Game } from '@/types/game';
 interface GameModalProps {
   show: boolean;
   onHide: () => void;
-  onSave: () => void;
-  game?: Game | null;
+  onSave: (gameData: Partial<Game>) => Promise<void>;
+  game: Game | null;
 }
 
 export default function GameModal({
@@ -19,7 +19,7 @@ export default function GameModal({
   onSave,
   game
 }: GameModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Partial<Game>>({
     name: '',
     gameplay_url: '',
     category_id: '',
@@ -35,7 +35,7 @@ export default function GameModal({
   });
 
   const [categories, setCategories] = useState([]);
-  const { fetchData, loading } = useApi();
+  const { fetchData } = useApi();
 
   useEffect(() => {
     if (game) {
@@ -84,72 +84,75 @@ export default function GameModal({
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    
+    // Xử lý giá trị dựa trên type của input
+    let parsedValue: string | number = value;
+    
+    if (type === 'number') {
+      parsedValue = value ? parseInt(value) : 0;
+    } else if (name === 'status') {
+      parsedValue = parseInt(value);
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: parsedValue
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetchData(API_ENDPOINTS.games, {
-        method: game ? 'PUT' : 'POST',
-        data: {
-          ...formData,
-          id: game?.id
-        }
-      });
-      onSave();
+      await onSave(formData);
       onHide();
     } catch (error) {
       console.error('Error saving game:', error);
     }
   };
 
-  // Automatic thumbnail URL generation based on game name
-  const handleNameChange = (name: string) => {
-    setFormData(prev => ({
-      ...prev,
-      name,
-      game_thumbnail: `https://classroom7x.github.io/${name.toLowerCase().replace(/\s+/g, '-')}.webp`
-    }));
-  };
-
   return (
     <Modal show={show} onHide={onHide} size="lg">
       <Modal.Header closeButton>
-        <Modal.Title>
-          {game ? 'Edit Game' : 'Add New Game'}
-        </Modal.Title>
+        <Modal.Title>{game ? 'Edit Game' : 'Add New Game'}</Modal.Title>
       </Modal.Header>
-      <Modal.Body>
-        <Form onSubmit={handleSubmit}>
+      <Form onSubmit={handleSubmit}>
+        <Modal.Body>
           <Form.Group className="mb-3">
-            <Form.Label>Name *</Form.Label>
+            <Form.Label>Name</Form.Label>
             <Form.Control
               type="text"
+              name="name"
               value={formData.name}
-              onChange={(e) => handleNameChange(e.target.value)}
+              onChange={handleChange}
               required
             />
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label>Gameplay URL *</Form.Label>
+            <Form.Label>Gameplay URL</Form.Label>
             <Form.Control
               type="url"
+              name="gameplay_url"
               value={formData.gameplay_url}
-              onChange={(e) => setFormData({...formData, gameplay_url: e.target.value})}
+              onChange={handleChange}
               required
             />
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label>Category *</Form.Label>
+            <Form.Label>Category</Form.Label>
             <Form.Select
+              name="category_id"
               value={formData.category_id}
-              onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+              onChange={handleChange}
               required
             >
               <option value="">Select Category</option>
-              {categories.map((category: any) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
+              {categories.map((cat: any) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
                 </option>
               ))}
             </Form.Select>
@@ -159,8 +162,9 @@ export default function GameModal({
             <Form.Label>Game Source</Form.Label>
             <Form.Control
               type="text"
+              name="game_source"
               value={formData.game_source}
-              onChange={(e) => setFormData({...formData, game_source: e.target.value})}
+              onChange={handleChange}
             />
           </Form.Group>
 
@@ -168,17 +172,11 @@ export default function GameModal({
             <Form.Label>Thumbnail URL</Form.Label>
             <Form.Control
               type="url"
+              name="game_thumbnail"
               value={formData.game_thumbnail}
-              onChange={(e) => setFormData({...formData, game_thumbnail: e.target.value})}
+              onChange={handleChange}
+              required
             />
-            {formData.game_thumbnail && (
-              <img 
-                src={formData.game_thumbnail} 
-                alt="Thumbnail Preview"
-                className="mt-2 rounded"
-                style={{ maxWidth: '200px' }}
-              />
-            )}
           </Form.Group>
 
           <Form.Group className="mb-3">
@@ -186,8 +184,9 @@ export default function GameModal({
             <Form.Control
               as="textarea"
               rows={3}
+              name="game_desc"
               value={formData.game_desc}
-              onChange={(e) => setFormData({...formData, game_desc: e.target.value})}
+              onChange={handleChange}
             />
           </Form.Group>
 
@@ -196,8 +195,9 @@ export default function GameModal({
             <Form.Control
               as="textarea"
               rows={3}
+              name="game_instruction"
               value={formData.game_instruction}
-              onChange={(e) => setFormData({...formData, game_instruction: e.target.value})}
+              onChange={handleChange}
             />
           </Form.Group>
 
@@ -205,8 +205,9 @@ export default function GameModal({
             <Form.Label>Developer</Form.Label>
             <Form.Control
               type="text"
+              name="developer"
               value={formData.developer}
-              onChange={(e) => setFormData({...formData, developer: e.target.value})}
+              onChange={handleChange}
             />
           </Form.Group>
 
@@ -214,10 +215,10 @@ export default function GameModal({
             <Form.Label>Published Year</Form.Label>
             <Form.Control
               type="number"
-              min={1970}
-              max={new Date().getFullYear()}
+              name="published_year"
               value={formData.published_year}
-              onChange={(e) => setFormData({...formData, published_year: parseInt(e.target.value)})}
+              onChange={handleChange}
+              required
             />
           </Form.Group>
 
@@ -226,8 +227,9 @@ export default function GameModal({
             <Form.Control
               as="textarea"
               rows={2}
+              name="meta_desc"
               value={formData.meta_desc}
-              onChange={(e) => setFormData({...formData, meta_desc: e.target.value})}
+              onChange={handleChange}
             />
           </Form.Group>
 
@@ -235,32 +237,34 @@ export default function GameModal({
             <Form.Label>Meta Title</Form.Label>
             <Form.Control
               type="text"
+              name="meta_title"
               value={formData.meta_title}
-              onChange={(e) => setFormData({...formData, meta_title: e.target.value})}
+              onChange={handleChange}
             />
           </Form.Group>
 
           <Form.Group className="mb-3">
             <Form.Label>Status</Form.Label>
             <Form.Select
+              name="status"
               value={formData.status}
-              onChange={(e) => setFormData({...formData, status: parseInt(e.target.value)})}
+              onChange={handleChange}
+              required
             >
-              <option value={1}>Online</option>
-              <option value={0}>Offline</option>
+              <option value={1}>Active</option>
+              <option value={0}>Inactive</option>
             </Form.Select>
           </Form.Group>
-
-          <div className="d-flex justify-content-end gap-2">
-            <Button variant="secondary" onClick={onHide}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? 'Saving...' : 'Save'}
-            </Button>
-          </div>
-        </Form>
-      </Modal.Body>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit">
+            Save Changes
+          </Button>
+        </Modal.Footer>
+      </Form>
     </Modal>
   );
 } 

@@ -15,14 +15,9 @@ export default function Sidebar() {
     { href: "/cloudarcade", icon: "code", label: "Cloudarcade JSON" },
   ];
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
-
   return (
-    <nav className="col-auto bg-dark sidebar">
-      <div className="position-sticky">
+    <div className="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
+      <div className="position-sticky pt-3">
         <ul className="nav flex-column">
           {menuItems.map((item) => (
             <li key={item.href} className="nav-item">
@@ -30,21 +25,13 @@ export default function Sidebar() {
                 href={item.href}
                 className={`nav-link text-white py-2 px-3 ${pathname === item.href ? 'active' : ''}`}
               >
-                <i className={`fas fa-${item.icon} fa-fw`}></i>
-                <span className="ms-2 d-none d-md-inline">{item.label}</span>
+                <i className={`fas fa-${item.icon} fa-fw me-2`}></i>
+                <span>{item.label}</span>
               </Link>
             </li>
           ))}
         </ul>
       </div>
-      <div className="mt-auto p-4">
-        <button
-          onClick={handleLogout}
-          className="w-full px-4 py-2 text-sm text-white bg-red-600 rounded hover:bg-red-700"
-        >
-          Logout
-        </button>
-      </div>
-    </nav>
+    </div>
   );
 } 
