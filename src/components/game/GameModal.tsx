@@ -35,7 +35,7 @@ export default function GameModal({
   });
 
   const [categories, setCategories] = useState([]);
-  const { fetchData } = useApi();
+  const { get } = useApi();
 
   useEffect(() => {
     if (game) {
@@ -77,10 +77,11 @@ export default function GameModal({
 
   const fetchCategories = async () => {
     try {
-      const data = await fetchData(API_ENDPOINTS.categories);
+      const data = await get(API_ENDPOINTS.categories);
       setCategories(data);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      setCategories([]);
     }
   };
 

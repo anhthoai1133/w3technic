@@ -10,7 +10,7 @@ import { useApi } from '@/hooks/useApi';
 import { API_ENDPOINTS } from '@/config/api';
 import type { Website } from '@/types/website';
 import { TableColumn } from 'react-data-table-component';
-import { mockWebsites } from '@/mocks/data';
+import { Button } from 'react-bootstrap';
 
 // Thêm interface FormData
 interface FormData {
@@ -31,7 +31,7 @@ export default function WebPage() {
   const [websites, setWebsites] = useState<Website[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
-  const { fetchData, loading: apiLoading } = useApi();
+  const { get, post, put, delete: deleteApi, loading: apiLoading } = useApi();
   const [formData, setFormData] = useState<FormData>({
     name: '',
     url: '',
@@ -126,11 +126,7 @@ export default function WebPage() {
     
     checkUser();
     
-    // Tạm thời dùng mock data
-    setWebsites(mockWebsites.map(site => ({
-      ...site,
-      category_id: site.category_id.toString()
-    })));
+    fetchWebsites();
   }, [router]);
 
   useEffect(() => {
@@ -161,10 +157,11 @@ export default function WebPage() {
 
   const fetchWebsites = async () => {
     try {
-      const data = await fetchData(API_ENDPOINTS.websites);
+      const data = await get(API_ENDPOINTS.websites);
       setWebsites(data);
     } catch (error) {
       console.error('Error fetching websites:', error);
+      setWebsites([]);
     }
   };
 
@@ -176,10 +173,8 @@ export default function WebPage() {
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this website?')) {
       try {
-        await fetchData(`${API_ENDPOINTS.websites}/${id}`, {
-          method: 'DELETE'
-        });
-        fetchWebsites();
+        await deleteApi(API_ENDPOINTS.website(id));
+        await fetchWebsites();
       } catch (error) {
         console.error('Error deleting website:', error);
       }
@@ -190,15 +185,9 @@ export default function WebPage() {
     e.preventDefault();
     try {
       if (selectedWebsite) {
-        await fetchData(`${API_ENDPOINTS.websites}/${selectedWebsite.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(formData)
-        });
+        await put(API_ENDPOINTS.website(selectedWebsite.id), formData);
       } else {
-        await fetchData(API_ENDPOINTS.websites, {
-          method: 'POST',
-          body: JSON.stringify(formData)
-        });
+        await post(API_ENDPOINTS.websites, formData);
       }
       fetchWebsites();
       setShowModal(false);
@@ -213,23 +202,17 @@ export default function WebPage() {
 
   return (
     <DashboardLayout title="Website Management">
-      <div className="mb-4 d-flex justify-content-end">
-        <button 
-          className="btn btn-primary"
-          onClick={() => {
-            setSelectedWebsite(null);
-            setShowModal(true);
-          }}
-        >
-          <i className="fas fa-plus me-2"></i>
+      <div className="mb-3 d-flex justify-content-between">
+        <Button variant="primary" onClick={() => { setSelectedWebsite(null); setShowModal(true); }}>
           Add New Website
-        </button>
+        </Button>
       </div>
       
       <CustomDataTable
         columns={columns}
         data={websites}
         loading={apiLoading}
+        pagination
         buttons={{
           copy: true,
           csv: true,

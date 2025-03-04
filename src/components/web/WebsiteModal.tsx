@@ -32,7 +32,7 @@ export default function WebsiteModal({
 
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [categories, setCategories] = useState<any[]>([]); // Initialize as empty array
-  const { fetchData, loading } = useApi();
+  const { fetchData, loading, post, put, get } = useApi();
 
   useEffect(() => {
     if (website) {
@@ -66,11 +66,11 @@ export default function WebsiteModal({
 
   const fetchCategories = async () => {
     try {
-      const categories = await fetchData(API_ENDPOINTS.categories);
-      setCategories(Array.isArray(categories) ? categories : []); // Ensure we have an array
+      const data = await get(API_ENDPOINTS.categories);
+      setCategories(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      setCategories([]); // Set empty array on error
+      setCategories([]);
     }
   };
 
@@ -112,15 +112,9 @@ export default function WebsiteModal({
       };
 
       if (website) {
-        await fetchData(`${API_ENDPOINTS.websites}/${website.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(submitData)
-        });
+        await put(API_ENDPOINTS.website(website.id), submitData);
       } else {
-        await fetchData(API_ENDPOINTS.websites, {
-          method: 'POST',
-          body: JSON.stringify(submitData)
-        });
+        await post(API_ENDPOINTS.websites, submitData);
       }
       onSave();
       onHide();

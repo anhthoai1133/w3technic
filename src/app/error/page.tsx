@@ -6,6 +6,7 @@ import CustomDataTable from '@/components/common/CustomDataTable';
 import { TableColumn } from 'react-data-table-component';
 import { useApi } from '@/hooks/useApi';
 import { API_ENDPOINTS } from '@/config/api';
+import { Button } from 'react-bootstrap';
 
 interface ErrorLog {
   id: number;
@@ -19,10 +20,9 @@ interface ErrorLog {
 
 export default function ErrorPage() {
   const [errors, setErrors] = useState<ErrorLog[]>([]);
-  const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const { fetchData } = useApi();
+  const { get, delete: deleteApi, loading } = useApi();
 
   useEffect(() => {
     fetchErrors();
@@ -30,13 +30,11 @@ export default function ErrorPage() {
 
   const fetchErrors = async () => {
     try {
-      setLoading(true);
-      const data = await fetchData(API_ENDPOINTS.error_logs);
+      const data = await get(API_ENDPOINTS.error_logs);
       setErrors(data);
     } catch (error) {
-      console.error('Error fetching errors:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching error logs:', error);
+      setErrors([]);
     }
   };
 
@@ -101,9 +99,7 @@ export default function ErrorPage() {
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this error log?')) {
       try {
-        await fetchData(`${API_ENDPOINTS.error_logs}/${id}`, {
-          method: 'DELETE'
-        });
+        await deleteApi(API_ENDPOINTS.error_log(id));
         await fetchErrors();
       } catch (error) {
         console.error('Error deleting error log:', error);
@@ -114,7 +110,7 @@ export default function ErrorPage() {
   const handleClearAll = async () => {
     if (confirm('Are you sure you want to clear all error logs?')) {
       try {
-        await fetchData(`${API_ENDPOINTS.error_logs}`, {
+        await get(API_ENDPOINTS.error_logs, {
           method: 'DELETE'
         });
         await fetchErrors();
@@ -210,6 +206,7 @@ export default function ErrorPage() {
         columns={columns}
         data={errors}
         loading={loading}
+        pagination
         buttons={{
           copy: true,
           csv: true,

@@ -19,7 +19,7 @@ export default function ErrorModal({
   onSave,
   error
 }: ErrorModalProps) {
-  const { fetchData, loading } = useApi();
+  const { fetchData, loading, put, post, get } = useApi();
   const [websites, setWebsites] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [formData, setFormData] = useState({
@@ -52,10 +52,11 @@ export default function ErrorModal({
 
   const fetchWebsites = async () => {
     try {
-      const data = await fetchData(API_ENDPOINTS.websites);
+      const data = await get(API_ENDPOINTS.websites);
       setWebsites(data);
     } catch (error) {
       console.error('Error fetching websites:', error);
+      setWebsites([]);
     }
   };
 
@@ -69,13 +70,17 @@ export default function ErrorModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetchData(API_ENDPOINTS.errors.create, {
-        method: error ? 'PUT' : 'POST',
-        data: {
-          ...formData,
-          id: error?.id
-        }
-      });
+      const submitData = {
+        ...formData,
+        id: error?.id
+      };
+      
+      if (error) {
+        await put(API_ENDPOINTS.error_log(error.id), submitData);
+      } else {
+        await post(API_ENDPOINTS.error_logs, submitData);
+      }
+      
       onSave();
       onHide();
     } catch (err) {

@@ -13,10 +13,19 @@ declare module 'jspdf' {
   }
 }
 
+interface AutoTableData {
+  settings: {
+    margin: {
+      left: number;
+    };
+  };
+}
+
 interface CustomDataTableProps {
   columns: TableColumn<any>[];
   data: any[];
   loading?: boolean;
+  pagination?: boolean;
   buttons?: {
     copy?: boolean;
     csv?: boolean;
@@ -28,17 +37,40 @@ interface CustomDataTableProps {
   onSelectedRowsChange?: (selectedRows: any) => void;
 }
 
+const customStyles = {
+  rows: {
+    style: {
+      minHeight: '52px',
+    }
+  },
+  headCells: {
+    style: {
+      paddingLeft: '8px',
+      paddingRight: '8px',
+      backgroundColor: '#f8f9fa',
+      fontWeight: 'bold'
+    },
+  },
+  cells: {
+    style: {
+      paddingLeft: '8px',
+      paddingRight: '8px',
+    },
+  },
+};
+
 const CustomDataTable: React.FC<CustomDataTableProps> = ({ 
   columns, 
   data, 
   loading = false,
   buttons = {
-    copy: false,
-    csv: false,
-    excel: false,
-    pdf: false,
-    print: false
+    copy: true,
+    csv: true,
+    excel: true,
+    pdf: true,
+    print: true
   },
+  pagination = true,
   selectableRows = false,
   onSelectedRowsChange
 }) => {
@@ -64,51 +96,27 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
 
   // Chuẩn bị dữ liệu để xuất
   const prepareExportData = () => {
-    const exportableColumns = getExportableColumns();
+    if (!data || data.length === 0) {
+      // Nếu không có dữ liệu, trả về mảng chỉ có header
+      const headers = getExportableColumns().map(col => col.name);
+      return [headers];
+    }
     
-    return data.map(item => {
-      const row: Record<string, any> = {};
-      
-      exportableColumns.forEach(col => {
+    const exportableColumns = getExportableColumns();
+    const headers = exportableColumns.map(col => col.name);
+    
+    const rows = data.map(row => {
+      return exportableColumns.map(col => {
         // @ts-ignore
         const selector = col.selector;
-        const name = col.name as string;
-        
-        if (typeof selector === 'function') {
-          row[name] = selector(item);
-        } else if (selector) {
-          row[name] = item[selector as keyof typeof item];
-        } else if (typeof col.cell === 'function') {
-          const cellContent = col.cell(item, 0, col, 0);
-          
-          if (React.isValidElement(cellContent)) {
-            // Xử lý thẻ img
-            if (cellContent.type === 'img') {
-              // Lấy src của hình ảnh
-              row[name] = (cellContent.props as any).src || '';
-            }
-            // Xử lý thẻ a
-            else if (cellContent.type === 'a' && (cellContent.props as any).href) {
-              row[name] = (cellContent.props as any).href || '';
-            }
-            // Xử lý thẻ span có class badge
-            else if (cellContent.type === 'span' && 
-                (cellContent.props as any).className && 
-                (cellContent.props as any).className.includes('badge')) {
-              row[name] = (cellContent.props as any).children || '';
-            }
-            // Xử lý các trường hợp khác
-            else {
-              row[name] = (cellContent.props as any).children || '';
-            }
-          } else {
-            row[name] = String(cellContent || '');
-          }
+        if (selector && typeof selector === 'function') {
+          return selector(row);
         }
+        return '';
       });
-      
-      return row;
     });
+    
+    return [headers, ...rows];
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,33 +136,48 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
 
   const exportToPDF = () => {
     const exportData = prepareExportData();
-    const exportColumns = getExportableColumns();
+    const headers = exportData[0];
+    const rows = exportData.slice(1);
     
     const doc = new jsPDF();
     doc.autoTable({
-      head: [exportColumns.map(col => col.name)],
-      body: exportData.map(item => exportColumns.map(col => item[col.name as string] || ''))
+      head: [headers],
+      body: rows.length > 0 ? rows : [Array(headers.length).fill('No data')],
+      startY: 20,
+      margin: { top: 20 },
+      styles: { overflow: 'linebreak' },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      didDrawPage: function(data: AutoTableData) {
+        // Header
+        doc.setFontSize(20);
+        doc.setTextColor(40);
+        doc.text('Data Export', data.settings.margin.left, 10);
+      }
     });
-    doc.save('table.pdf');
+    
+    doc.save('export.pdf');
   };
 
   const exportToExcel = () => {
     const exportData = prepareExportData();
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-    XLSX.writeFile(workbook, 'table.xlsx');
+    const ws = XLSX.utils.aoa_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    XLSX.writeFile(wb, 'export.xlsx');
   };
 
   const exportToCSV = () => {
     const exportData = prepareExportData();
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const csv = XLSX.utils.sheet_to_csv(worksheet);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const csvContent = exportData.map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    link.href = url;
-    link.setAttribute('download', 'table.csv');
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'export.csv');
+    link.style.visibility = 'hidden';
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -162,101 +185,59 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
 
   const copyToClipboard = () => {
     const exportData = prepareExportData();
-    const exportColumns = getExportableColumns();
+    const textContent = exportData.map(row => row.join('\t')).join('\n');
     
-    const header = exportColumns.map(col => col.name).join('\t');
-    const rows = exportData.map(item => 
-      exportColumns.map(col => item[col.name as string] || '').join('\t')
-    ).join('\n');
-    
-    const text = header + '\n' + rows;
-    
-    navigator.clipboard.writeText(text);
-    alert('Copied to clipboard');
+    navigator.clipboard.writeText(textContent).then(
+      () => {
+        alert('Data copied to clipboard');
+      },
+      (err) => {
+        console.error('Could not copy text: ', err);
+      }
+    );
   };
 
   const printTable = () => {
     const exportData = prepareExportData();
-    const exportColumns = getExportableColumns();
+    const headers = exportData[0];
+    const rows = exportData.slice(1);
     
-    const printWindow = window.open('', '_blank');
+    let printWindow = window.open('', '_blank');
     if (!printWindow) return;
     
-    const html = `
-      <!DOCTYPE html>
+    const htmlContent = `
       <html>
         <head>
-          <title>Print Table</title>
+          <title>Print</title>
           <style>
-            body { font-family: Arial, sans-serif; }
             table { border-collapse: collapse; width: 100%; }
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; }
-            tr:nth-child(even) { background-color: #f9f9f9; }
           </style>
         </head>
         <body>
-          <h1>Table Data</h1>
+          <h1>Data Export</h1>
           <table>
             <thead>
-              <tr>
-                ${exportColumns.map(col => `<th>${col.name}</th>`).join('')}
-              </tr>
+              <tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr>
             </thead>
             <tbody>
-              ${exportData.map(item => `
-                <tr>
-                  ${exportColumns.map(col => `<td>${item[col.name as string] || ''}</td>`).join('')}
-                </tr>
-              `).join('')}
+              ${rows.length > 0 
+                ? rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')
+                : `<tr>${Array(headers.length).fill('<td>No data</td>').join('')}</tr>`
+              }
             </tbody>
           </table>
-          <script>
-            setTimeout(() => {
-              window.print();
-              window.close();
-            }, 500);
-          </script>
         </body>
       </html>
     `;
     
-    printWindow.document.write(html);
+    printWindow.document.write(htmlContent);
     printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
   };
-
-  const customStyles = {
-    headRow: {
-      style: {
-        backgroundColor: '#f8f9fa',
-        borderBottom: '1px solid #dee2e6',
-      },
-    },
-    headCells: {
-      style: {
-        fontSize: '14px',
-        fontWeight: '600',
-        padding: '16px',
-      },
-    },
-    rows: {
-      style: {
-        fontSize: '14px',
-        '&:not(:last-of-type)': {
-          borderBottom: '1px solid #dee2e6',
-        },
-      },
-    },
-    cells: {
-      style: {
-        padding: '16px',
-      },
-    },
-  };
-
-  if (!mounted) {
-    return null;
-  }
 
   return (
     <div className="custom-datatable">
@@ -284,7 +265,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           )}
           {buttons.print && (
             <button className="btn btn-sm btn-outline-secondary" onClick={printTable}>
-              Print all
+              Print
             </button>
           )}
         </div>
@@ -304,7 +285,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
       <DataTable
         columns={columns}
         data={filteredData}
-        pagination
+        pagination={pagination}
         paginationPerPage={rowsPerPage}
         paginationRowsPerPageOptions={[10, 25, 50, 100]}
         responsive

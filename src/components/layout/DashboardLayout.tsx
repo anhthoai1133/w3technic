@@ -3,6 +3,7 @@
 import { ReactNode } from 'react';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -20,7 +21,9 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
             <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
               <h1 className="h2">{title}</h1>
             </div>
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </main>
         </div>
       </div>

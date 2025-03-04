@@ -7,6 +7,7 @@ import { TableColumn } from 'react-data-table-component';
 import ExtensionModal from '@/components/extension/ExtensionModal';
 import { useApi } from '@/hooks/useApi';
 import { API_ENDPOINTS } from '@/config/api';
+import { Button } from 'react-bootstrap';
 
 interface Extension {
   id: number;
@@ -21,10 +22,9 @@ interface Extension {
 
 export default function ExtensionPage() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
-  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
-  const { fetchData } = useApi();
+  const { get, post, put, delete: deleteApi, loading } = useApi();
 
   useEffect(() => {
     fetchExtensions();
@@ -32,13 +32,11 @@ export default function ExtensionPage() {
 
   const fetchExtensions = async () => {
     try {
-      setLoading(true);
-      const data = await fetchData(API_ENDPOINTS.extensions);
+      const data = await get(API_ENDPOINTS.extensions);
       setExtensions(data);
     } catch (error) {
       console.error('Error fetching extensions:', error);
-    } finally {
-      setLoading(false);
+      setExtensions([]);
     }
   };
 
@@ -50,9 +48,7 @@ export default function ExtensionPage() {
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this extension?')) {
       try {
-        await fetchData(`${API_ENDPOINTS.extensions}/${id}`, {
-          method: 'DELETE'
-        });
+        await deleteApi(API_ENDPOINTS.extension(id));
         await fetchExtensions();
       } catch (error) {
         console.error('Error deleting extension:', error);
@@ -60,18 +56,12 @@ export default function ExtensionPage() {
     }
   };
 
-  const handleSave = async (extensionData: Partial<Extension>): Promise<void> => {
+  const handleSave = async (extensionData: Partial<Extension>) => {
     try {
       if (selectedExtension) {
-        await fetchData(`${API_ENDPOINTS.extensions}/${selectedExtension.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(extensionData)
-        });
+        await put(API_ENDPOINTS.extension(selectedExtension.id), extensionData);
       } else {
-        await fetchData(API_ENDPOINTS.extensions, {
-          method: 'POST',
-          body: JSON.stringify(extensionData)
-        });
+        await post(API_ENDPOINTS.extensions, extensionData);
       }
       await fetchExtensions();
       setShowModal(false);
@@ -163,23 +153,23 @@ export default function ExtensionPage() {
 
   return (
     <DashboardLayout title="Extension Management">
-      <div className="mb-4 d-flex justify-content-end">
-        <button 
-          className="btn btn-primary"
+      <div className="mb-3 d-flex justify-content-between">
+        <Button 
+          variant="primary"
           onClick={() => {
             setSelectedExtension(null);
             setShowModal(true);
           }}
         >
-          <i className="fas fa-plus me-2"></i>
           Add New Extension
-        </button>
+        </Button>
       </div>
       
       <CustomDataTable
         columns={columns}
         data={extensions}
         loading={loading}
+        pagination
         buttons={{
           copy: true,
           csv: true,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
+import { useApi } from '@/hooks/useApi';
 
 interface Extension {
   id: number;
@@ -30,6 +31,8 @@ export default function ExtensionModal({ show, onHide, onSave, extension }: Exte
     extension_url: '',
     users: 0
   });
+
+  const { loading } = useApi();
 
   useEffect(() => {
     if (extension) {
