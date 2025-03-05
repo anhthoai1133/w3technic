@@ -4,86 +4,147 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import CustomDataTable from '@/components/common/CustomDataTable';
 import { TableColumn } from 'react-data-table-component';
-import { useApi } from '@/hooks/useApi';
-import { API_ENDPOINTS } from '@/config/api';
+import ErrorModal from '@/components/error/ErrorModal';
 import { Button } from 'react-bootstrap';
+import { dataService } from '@/services/dataService';
 
-interface ErrorLog {
+interface Error {
   id: number;
-  message: string;
-  url: string;
-  status_code: number;
-  browser: string;
-  ip_address: string;
+  website_id: number;
+  website_name: string;
+  error_message: string;
+  error_type: string;
+  error_url: string;
+  status: number;
+  solution: string;
+  notes: string;
   created_at: string;
 }
 
 export default function ErrorPage() {
-  const [errors, setErrors] = useState<ErrorLog[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const { get, delete: deleteApi, loading } = useApi();
+  const [errors, setErrors] = useState<Error[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedError, setSelectedError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchErrors();
   }, []);
 
   const fetchErrors = async () => {
+    setLoading(true);
     try {
-      const data = await get(API_ENDPOINTS.error_logs);
+      const data = await dataService.getErrors();
       setErrors(data);
     } catch (error) {
       console.error('Error fetching error logs:', error);
       setErrors([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const columns: TableColumn<ErrorLog>[] = [
-    { 
+  const handleEdit = (error: Error) => {
+    setSelectedError(error);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Are you sure you want to delete this error log?')) {
+      setLoading(true);
+      try {
+        await dataService.deleteError(id);
+        await fetchErrors();
+      } catch (error) {
+        console.error('Error deleting error log:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (confirm('Are you sure you want to clear all error logs?')) {
+      setLoading(true);
+      try {
+        await dataService.clearAllLogs();
+        await fetchErrors();
+      } catch (error) {
+        console.error('Error clearing error logs:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    await fetchErrors();
+    setShowModal(false);
+  };
+
+  const getStatusBadge = (status: number) => {
+    switch (status) {
+      case 0:
+        return <span className="badge bg-danger">Open</span>;
+      case 1:
+        return <span className="badge bg-warning">In Progress</span>;
+      case 2:
+        return <span className="badge bg-success">Resolved</span>;
+      default:
+        return <span className="badge bg-secondary">Unknown</span>;
+    }
+  };
+
+  const columns: TableColumn<Error>[] = [
+    {
       name: 'ID',
-      selector: (row: ErrorLog) => row.id,
+      selector: (row: Error) => row.id,
       sortable: true,
       width: '70px'
     },
-    { 
-      name: 'Message',
-      selector: (row: ErrorLog) => row.message,
+    {
+      name: 'Website',
+      selector: (row: Error) => row.website_name || 'N/A',
       sortable: true
     },
     {
-      name: 'URL',
-      cell: (row: ErrorLog) => (
-        <a href={row.url} target="_blank" rel="noopener noreferrer" className="text-truncate d-block" style={{ maxWidth: '250px' }}>
-          {row.url}
-        </a>
-      ),
+      name: 'Error Type',
+      selector: (row: Error) => row.error_type,
       sortable: true
     },
-    { 
-      name: 'Status Code',
-      selector: (row: ErrorLog) => row.status_code,
+    {
+      name: 'Error Message',
+      selector: (row: Error) => row.error_message,
       sortable: true,
-      width: '120px'
+      wrap: true,
+      cell: (row: Error) => (
+        <div className="text-truncate" style={{ maxWidth: '300px' }}>
+          {row.error_message}
+        </div>
+      )
     },
-    { 
-      name: 'Browser',
-      selector: (row: ErrorLog) => row.browser,
-      sortable: true
+    {
+      name: 'Status',
+      selector: (row: Error) => row.status,
+      sortable: true,
+      cell: (row: Error) => getStatusBadge(row.status)
     },
-    { 
-      name: 'IP Address',
-      selector: (row: ErrorLog) => row.ip_address,
-      sortable: true
-    },
-    { 
+    {
       name: 'Created At',
-      selector: (row: ErrorLog) => row.created_at,
-      sortable: true
+      selector: (row: Error) => row.created_at,
+      sortable: true,
+      format: (row: Error) => new Date(row.created_at).toLocaleString()
     },
     {
       name: 'Actions',
-      cell: (row: ErrorLog) => (
+      cell: (row: Error) => (
         <div className="d-flex gap-2">
+          <button 
+            className="btn btn-sm btn-primary"
+            onClick={() => handleEdit(row)}
+          >
+            <i className="fas fa-edit"></i>
+          </button>
           <button 
             className="btn btn-sm btn-danger"
             onClick={() => handleDelete(row.id)}
@@ -92,114 +153,19 @@ export default function ErrorPage() {
           </button>
         </div>
       ),
-      width: '100px'
+      width: '120px'
     }
   ];
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this error log?')) {
-      try {
-        await deleteApi(API_ENDPOINTS.error_log(id));
-        await fetchErrors();
-      } catch (error) {
-        console.error('Error deleting error log:', error);
-      }
-    }
-  };
-
-  const handleClearAll = async () => {
-    if (confirm('Are you sure you want to clear all error logs?')) {
-      try {
-        await get(API_ENDPOINTS.error_logs, {
-          method: 'DELETE'
-        });
-        await fetchErrors();
-      } catch (error) {
-        console.error('Error clearing error logs:', error);
-      }
-    }
-  };
-
-  const handleQuickSelect = (days: number) => {
-    if (typeof window !== 'undefined') {
-      const end = new Date();
-      const start = new Date();
-      start.setDate(end.getDate() - days);
-      
-      setEndDate(end.toISOString().split('T')[0]);
-      setStartDate(start.toISOString().split('T')[0]);
-    }
-  };
-
-  const handleFilter = () => {
-    // Implement filtering logic here
-    alert(`Filtering errors from ${startDate} to ${endDate}`);
-  };
-
   return (
     <DashboardLayout title="Error Logs">
-      <div className="card mb-4">
-        <div className="card-body">
-          <div className="row mb-3">
-            <div className="col-md-4">
-              <label className="form-label">Start Date:</label>
-              <input
-                type="date"
-                className="form-control"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-            <div className="col-md-4">
-              <label className="form-label">End Date:</label>
-              <input
-                type="date" 
-                className="form-control"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-            <div className="col-md-4">
-              <label className="form-label">Quick Select:</label>
-              <div className="btn-group w-100">
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => handleQuickSelect(0)}
-                >
-                  Today
-                </button>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => handleQuickSelect(7)}
-                >
-                  Last 7 Days
-                </button>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => handleQuickSelect(30)}
-                >
-                  Last 30 Days
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="d-flex justify-content-between">
-            <button 
-              className="btn btn-primary"
-              onClick={handleFilter}
-            >
-              <i className="fas fa-filter me-2"></i>
-              Filter
-            </button>
-            <button 
-              className="btn btn-danger"
-              onClick={handleClearAll}
-            >
-              <i className="fas fa-trash me-2"></i>
-              Clear All Errors
-            </button>
-          </div>
-        </div>
+      <div className="mb-3 d-flex justify-content-between">
+        <Button variant="primary" onClick={() => { setSelectedError(null); setShowModal(true); }}>
+          Add New Error Log
+        </Button>
+        <Button variant="danger" onClick={handleClearAll}>
+          Clear All Logs
+        </Button>
       </div>
       
       <CustomDataTable
@@ -214,6 +180,13 @@ export default function ErrorPage() {
           pdf: true,
           print: true
         }}
+      />
+      
+      <ErrorModal
+        show={showModal}
+        onHide={() => setShowModal(false)}
+        onSave={handleSave}
+        error={selectedError}
       />
     </DashboardLayout>
   );

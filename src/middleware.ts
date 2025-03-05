@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
   // Kiểm tra xem có phải là service worker hoặc các tài nguyên tĩnh không
+  return NextResponse.next()
   if (
     req.nextUrl.pathname.startsWith('/_next') || 
     req.nextUrl.pathname.startsWith('/api') ||
@@ -18,7 +19,6 @@ export async function middleware(req: NextRequest) {
 
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req, res })
-  
   try {
     // Get session
     const { data: { session } } = await supabase.auth.getSession()

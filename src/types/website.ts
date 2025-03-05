@@ -10,6 +10,7 @@ export interface Website {
   category_name?: string;
   is_featured: boolean;
   extensions?: string[];
+  description?: string;
 }
 
 export interface Extension {

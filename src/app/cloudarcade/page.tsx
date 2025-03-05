@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import CustomDataTable from '@/components/common/CustomDataTable';
 import { TableColumn } from 'react-data-table-component';
-import { useApi } from '@/hooks/useApi';
-import { API_ENDPOINTS } from '@/config/api';
+import { dataService } from '@/services/dataService';
 
 interface Game {
   id: number;
@@ -30,7 +29,6 @@ export default function CloudarcadePage() {
   const [regenerateDescriptions, setRegenerateDescriptions] = useState(false);
   const [gameData, setGameData] = useState('');
   const [selectedGames, setSelectedGames] = useState<number[]>([]);
-  const { fetchData } = useApi();
 
   useEffect(() => {
     fetchGames();
@@ -39,7 +37,7 @@ export default function CloudarcadePage() {
   const fetchGames = async () => {
     try {
       setLoading(true);
-      const data = await fetchData(API_ENDPOINTS.games);
+      const data = await dataService.getGames();
       setGames(data);
     } catch (error) {
       console.error('Error fetching games:', error);

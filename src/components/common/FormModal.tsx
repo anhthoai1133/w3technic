@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Modal, Button } from 'react-bootstrap';
 
 interface FormModalProps {
@@ -18,22 +18,51 @@ export default function FormModal({
   title,
   children,
   loading = false,
-  onSubmit
+  onSubmit,
 }: FormModalProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Initial check
+    checkMobile();
+    
+    // Add resize listener
+    window.addEventListener('resize', checkMobile);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
-    <Modal show={show} onHide={onHide} size="lg">
+    <Modal 
+      show={show} 
+      onHide={onHide} 
+      centered
+      size={isMobile ? undefined : "lg"}
+      fullscreen={isMobile ? "sm-down" : undefined}
+    >
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
       <form onSubmit={onSubmit}>
-        <Modal.Body>
+        <Modal.Body className={isMobile ? "p-3" : "p-4"}>
           {children}
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onHide}>
+        <Modal.Footer className={isMobile ? "p-2" : "p-3"}>
+          <Button variant="secondary" onClick={onHide} size={isMobile ? "sm" : undefined}>
             Cancel
           </Button>
-          <Button variant="primary" type="submit" disabled={loading}>
+          <Button 
+            variant="primary" 
+            type="submit" 
+            disabled={loading}
+            size={isMobile ? "sm" : undefined}
+          >
             {loading ? 'Saving...' : 'Save'}
           </Button>
         </Modal.Footer>

@@ -1,54 +1,64 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import CustomDataTable from '@/components/common/CustomDataTable';
-import WebsiteModal from '@/components/web/WebsiteModal';
-import { useApi } from '@/hooks/useApi';
-import { API_ENDPOINTS } from '@/config/api';
-import type { Website } from '@/types/website';
-import { TableColumn } from 'react-data-table-component';
+import { useEffect, useState } from 'react';
 import { Button } from 'react-bootstrap';
+import { dataService } from '@/services/dataService';
+import CustomDataTable from '@/components/common/CustomDataTable';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useRouter } from 'next/navigation';
+import WebsiteModal from '@/components/web/WebsiteModal';
+import type { Website } from '@/types/website';
 
-// Thêm interface FormData
-interface FormData {
-  name: string;
-  url: string;
-  game_url: string;
-  icon: string;
-  status: number;
-  index_status: number;
-  category_id: string;
-  is_featured: boolean;
-}
-
-export default function WebPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export default function WebsitesPage() {
   const [websites, setWebsites] = useState<Website[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
-  const { get, post, put, delete: deleteApi, loading: apiLoading } = useApi();
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    url: '',
-    game_url: '',
-    icon: '',
-    status: 1,
-    index_status: 0, 
-    category_id: '',
-    is_featured: false
-  });
+  const router = useRouter();
 
-  const columns: TableColumn<Website>[] = [
-    { 
+  useEffect(() => {
+    fetchWebsites();
+  }, []);
+
+  const fetchWebsites = async () => {
+    try {
+      setLoading(true);
+      const data = await dataService.getWebsites();
+      console.log("Fetched websites:", data); // Debug log
+      setWebsites(data || []);
+    } catch (error) {
+      console.error('Error fetching websites:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (website: Website, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setSelectedWebsite(website);
+    setShowModal(true);
+  };
+
+  const handleSave = async (websiteData: Partial<Website>) => {
+    await fetchWebsites(); // Refresh data after save
+  };
+
+  const handleAddNew = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedWebsite(null);
+    setShowModal(true);
+  };
+
+  const columns = [
+    {
       name: 'ID',
       selector: (row: Website) => row.id,
       sortable: true,
-      width: '70px'
+      width: '80px',
     },
     {
       name: 'Icon',
@@ -56,176 +66,108 @@ export default function WebPage() {
         <img 
           src={row.icon || '/placeholder-icon.png'} 
           alt={row.name}
-          className="website-icon"
+          style={{ width: '32px', height: '32px', borderRadius: '4px' }}
         />
       ),
-      width: '80px'
+      width: '80px',
     },
-    { 
+    {
       name: 'Name',
       selector: (row: Website) => row.name,
-      sortable: true
+      sortable: true,
     },
     {
       name: 'URL',
+      selector: (row: Website) => row.url,
+      sortable: true,
       cell: (row: Website) => (
         <a href={row.url} target="_blank" rel="noopener noreferrer">
           {row.url}
         </a>
       ),
-      sortable: true
     },
     {
       name: 'Status',
+      selector: (row: Website) => row.status,
+      sortable: true,
       cell: (row: Website) => (
-        <span className={`badge ${row.status === 1 ? 'bg-success' : 'bg-danger'}`}>
+        <span className={`badge bg-${row.status === 1 ? 'success' : 'danger'}`}>
           {row.status === 1 ? 'Active' : 'Inactive'}
         </span>
       ),
-      sortable: true,
-      width: '100px'
+      width: '100px',
     },
     {
       name: 'Actions',
       cell: (row: Website) => (
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-1">
           <button 
             className="btn btn-sm btn-primary"
-            onClick={() => handleEdit(row)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(row, e);
+            }}
           >
             <i className="fas fa-edit"></i>
           </button>
           <button 
             className="btn btn-sm btn-danger"
-            onClick={() => handleDelete(row.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(row.id);
+            }}
           >
             <i className="fas fa-trash"></i>
           </button>
         </div>
       ),
-      width: '120px'
-    }
+      width: '120px',
+      ignoreRowClick: true,
+    },
   ];
 
-  useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          setUser(session.user);
-        } else {
-          router.push('/login');
-        }
-      } catch (error) {
-        console.error('Error checking session:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkUser();
-    
-    fetchWebsites();
-  }, [router]);
-
-  useEffect(() => {
-    if (selectedWebsite) {
-      setFormData({
-        name: selectedWebsite.name,
-        url: selectedWebsite.url,
-        game_url: selectedWebsite.game_url || '',
-        icon: selectedWebsite.icon || '',
-        status: selectedWebsite.status,
-        index_status: selectedWebsite.index_status,
-        category_id: selectedWebsite.category_id,
-        is_featured: selectedWebsite.is_featured
-      });
-    } else {
-      setFormData({
-        name: '',
-        url: '',
-        game_url: '',
-        icon: '',
-        status: 1,
-        index_status: 0,
-        category_id: '',
-        is_featured: false
-      });
-    }
-  }, [selectedWebsite]);
-
-  const fetchWebsites = async () => {
-    try {
-      const data = await get(API_ENDPOINTS.websites);
-      setWebsites(data);
-    } catch (error) {
-      console.error('Error fetching websites:', error);
-      setWebsites([]);
-    }
-  };
-
-  const handleEdit = (website: Website) => {
-    setSelectedWebsite(website);
-    setShowModal(true);
-  };
-
   const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this website?')) {
+    if (window.confirm('Are you sure you want to delete this website?')) {
       try {
-        await deleteApi(API_ENDPOINTS.website(id));
-        await fetchWebsites();
+        await dataService.deleteWebsite(id);
+        setWebsites(websites.filter(website => website.id !== id));
       } catch (error) {
         console.error('Error deleting website:', error);
       }
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (selectedWebsite) {
-        await put(API_ENDPOINTS.website(selectedWebsite.id), formData);
-      } else {
-        await post(API_ENDPOINTS.websites, formData);
-      }
-      fetchWebsites();
-      setShowModal(false);
-    } catch (error) {
-      console.error('Error submitting form:', error);
-    }
-  };
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
   return (
-    <DashboardLayout title="Website Management">
-      <div className="mb-3 d-flex justify-content-between">
-        <Button variant="primary" onClick={() => { setSelectedWebsite(null); setShowModal(true); }}>
+    <DashboardLayout title="Websites">
+      <div className="mb-4">
+        <Button 
+          variant="primary"
+          onClick={handleAddNew}
+        >
+          <i className="fas fa-plus me-2"></i>
           Add New Website
         </Button>
       </div>
-      
+
       <CustomDataTable
         columns={columns}
         data={websites}
-        loading={apiLoading}
+        loading={loading}
         pagination
         buttons={{
           copy: true,
           csv: true,
           excel: true,
           pdf: true,
-          print: true
+          print: true,
         }}
+        // onRowClicked={(row) => router.push(`/web/${row.id}`)}
       />
 
       <WebsiteModal
         show={showModal}
         onHide={() => setShowModal(false)}
-        onSave={fetchWebsites}
+        onSave={handleSave}
         website={selectedWebsite}
       />
     </DashboardLayout>
