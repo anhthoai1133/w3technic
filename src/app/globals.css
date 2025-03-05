@@ -697,3 +697,150 @@ img {
   .display-3 { font-size: 2.5rem; }
   .display-4 { font-size: 2.25rem; }
 }
+
+/* Layout styles */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Header styles */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  height: 60px;
+}
+
+/* Content wrapper */
+.content-wrapper {
+  display: flex;
+  flex-grow: 1;
+  margin-top: 60px;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+}
+
+/* Sidebar styles */
+.sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  bottom: 0;
+  width: 250px;
+  z-index: 1020;
+  overflow-y: auto;
+  transition: transform 0.3s ease, width 0s;
+  background-color: #343a40;
+  color: white;
+}
+
+.sidebar.hidden {
+  transform: translateX(-100%);
+}
+
+/* Main content styles */
+.main-content {
+  flex-grow: 1;
+  margin-left: 250px;
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+  transition: margin-left 0.3s ease;
+}
+
+.sidebar.hidden + .main-content {
+  margin-left: 0;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: 100%; /* Chiếm toàn bộ chiều rộng */
+    max-width: 300px; /* Giới hạn chiều rộng tối đa */
+  }
+  
+  .sidebar.show {
+    transform: translateX(0);
+  }
+  
+  .main-content {
+    margin-left: 0;
+  }
+  
+  /* Khi sidebar hiển thị, ngăn scroll trên body */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+}
+
+/* Overlay khi menu mở ở mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1015;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.sidebar-overlay.show {
+  display: block;
+  opacity: 1;
+}
+
+/* Ẩn nội dung cho đến khi đã khởi tạo xong */
+.dashboard-container > div:not(.initialized) {
+  opacity: 0;
+}
+
+.dashboard-container > .initialized {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+/* Đảm bảo sidebar không nhấp nháy khi chuyển trang */
+.sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  bottom: 0;
+  width: 250px;
+  z-index: 1020;
+  overflow-y: auto;
+  transition: transform 0.3s ease, width 0s;
+  background-color: #343a40;
+  color: white;
+}
+
+/* Ẩn nội dung cho đến khi đã khởi tạo xong */
+.not-initialized {
+  visibility: hidden;
+}
+
+/* Đảm bảo sidebar mobile luôn ẩn ban đầu */
+.sidebar.mobile {
+  transform: translateX(-100%);
+}
+
+.sidebar.mobile.show {
+  transform: translateX(0);
+}
+
+/* Đảm bảo sidebar desktop hiển thị đúng */
+.sidebar.desktop {
+  transform: translateX(0);
+}
+
+.sidebar.desktop.hidden {
+  transform: translateX(-100%);
+}
