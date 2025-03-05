@@ -24,7 +24,7 @@ export default function WebsitesPage() {
     try {
       setLoading(true);
       const data = await dataService.getWebsites();
-      console.log("Fetched websites:", data); // Debug log
+      console.log("Fetched websites:", data);
       setWebsites(data || []);
     } catch (error) {
       console.error('Error fetching websites:', error);
@@ -42,8 +42,8 @@ export default function WebsitesPage() {
     setShowModal(true);
   };
 
-  const handleSave = async (websiteData: Partial<Website>) => {
-    await fetchWebsites(); // Refresh data after save
+  const handleSave = async () => {
+    await fetchWebsites();
   };
 
   const handleAddNew = (e: React.MouseEvent) => {
@@ -58,18 +58,30 @@ export default function WebsitesPage() {
       name: 'ID',
       selector: (row: Website) => row.id,
       sortable: true,
-      width: '80px',
+      width: '60px',
     },
     {
       name: 'Icon',
-      cell: (row: Website) => (
-        <img 
-          src={row.icon || '/placeholder-icon.png'} 
-          alt={row.name}
-          style={{ width: '32px', height: '32px', borderRadius: '4px' }}
-        />
-      ),
+      cell: (row: Website) => {
+        if (!row.icon) {
+          return <div style={{ width: '32px', height: '32px' }}></div>;
+        }
+        
+        return (
+          <img 
+            src={row.icon} 
+            alt={row.name}
+            style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        );
+      },
       width: '80px',
+      exportable: true,
+      exportTransform: (value: string) => value ? 'Has icon' : 'No icon',
+      selector: (row: Website) => row.icon
     },
     {
       name: 'Name',
@@ -87,11 +99,16 @@ export default function WebsitesPage() {
       ),
     },
     {
+      name: 'Category',
+      selector: (row: Website) => row.category_name || '',
+      sortable: true,
+    },
+    {
       name: 'Status',
       selector: (row: Website) => row.status,
       sortable: true,
       cell: (row: Website) => (
-        <span className={`badge bg-${row.status === 1 ? 'success' : 'danger'}`}>
+        <span className={`badge ${row.status === 1 ? 'bg-success' : 'bg-danger'}`}>
           {row.status === 1 ? 'Active' : 'Inactive'}
         </span>
       ),
@@ -100,7 +117,7 @@ export default function WebsitesPage() {
     {
       name: 'Actions',
       cell: (row: Website) => (
-        <div className="d-flex gap-1">
+        <div className="d-flex gap-2">
           <button 
             className="btn btn-sm btn-primary"
             onClick={(e) => {
@@ -161,7 +178,6 @@ export default function WebsitesPage() {
           pdf: true,
           print: true,
         }}
-        // onRowClicked={(row) => router.push(`/web/${row.id}`)}
       />
 
       <WebsiteModal

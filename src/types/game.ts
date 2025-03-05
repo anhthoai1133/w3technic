@@ -13,6 +13,7 @@ export interface Game {
   meta_title: string;
   status: number;
   created_at: string;
+  category_name?: string;
 }
 
 export interface Category {

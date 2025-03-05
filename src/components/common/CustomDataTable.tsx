@@ -14,9 +14,12 @@ declare module 'jspdf' {
   }
 }
 
-// Mở rộng TableColumn để thêm thuộc tính searchable
-interface ExtendedTableColumn<T> extends TableColumn<T> {
+// Mở rộng TableColumn để thêm thuộc tính searchable và exportable
+interface ExtendedTableColumn<T> extends Omit<TableColumn<T>, 'selector'> {
   searchable?: boolean;
+  exportable?: boolean;
+  exportTransform?: (value: any) => string;
+  selector?: (row: T) => any;
 }
 
 interface CustomDataTableProps {
@@ -45,162 +48,229 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   pagination = true,
   selectableRows = false,
   onSelectedRowsChange,
-  buttons = {},
-  onRowClicked,
+  buttons = {
+    copy: false,
+    csv: false,
+    excel: false,
+    pdf: false,
+    print: false
+  },
+  onRowClicked
 }) => {
   const [filterText, setFilterText] = useState('');
   const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile view
   useEffect(() => {
-    const checkMobile = () => {
+    const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
     
-    // Initial check
-    checkMobile();
+    handleResize();
+    window.addEventListener('resize', handleResize);
     
-    // Add resize listener
-    window.addEventListener('resize', checkMobile);
-    
-    // Cleanup
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
-  // Filter data based on search text
-  const filteredItems = data && data.length > 0 ? data.filter(
-    item => {
-      if (!item) return false;
-      return Object.keys(item).some(key => {
-        const value = item[key];
-        if (value === null || value === undefined) return false;
-        return value.toString().toLowerCase().includes(filterText.toLowerCase());
-      });
-    }
-  ) : [];
+  // Lọc dữ liệu dựa trên filterText
+  const filteredItems = data.filter(item => {
+    return columns.some(column => {
+      // Chỉ tìm kiếm trên các cột có searchable = true hoặc không định nghĩa searchable
+      if (column.searchable === false) return false;
+      
+      // Lấy giá trị từ selector nếu có
+      let cellValue;
+      if (column.selector) {
+        cellValue = column.selector(item);
+      } else {
+        cellValue = item[column.name?.toString().toLowerCase() || ''];
+      }
+      
+      // Kiểm tra nếu giá trị tồn tại và chứa filterText
+      return cellValue !== undefined && 
+             cellValue !== null && 
+             String(cellValue).toLowerCase().includes(filterText.toLowerCase());
+    });
+  });
 
-  const handleClear = () => {
-    if (filterText) {
-      setResetPaginationToggle(!resetPaginationToggle);
-      setFilterText('');
-    }
-  };
-
-  // Export functions
-  const exportToCSV = () => {
-    // Lọc bỏ cột action (thường là cột cuối cùng)
-    const exportColumns = columns.filter(col => col.name !== 'Actions' && col.name !== 'Action');
-    const exportData = data.map(item => {
-      const row = {};
-      exportColumns.forEach(col => {
-        // @ts-ignore
-        row[col.name] = col.selector ? col.selector(item) : '';
+  // Chuẩn bị dữ liệu cho xuất file
+  const prepareExportData = () => {
+    return filteredItems.map(item => {
+      const row: Record<string, any> = {};
+      
+      columns.forEach(column => {
+        // Bỏ qua các cột không cần xuất
+        if (column.exportable === false) return;
+        
+        const columnName = column.name?.toString() || '';
+        
+        // Lấy giá trị từ selector nếu có
+        let cellValue;
+        if (column.selector) {
+          cellValue = column.selector(item);
+        } else {
+          cellValue = item[columnName.toLowerCase()];
+        }
+        
+        // Áp dụng hàm chuyển đổi nếu có
+        if (column.exportTransform && cellValue !== undefined) {
+          cellValue = column.exportTransform(cellValue);
+        }
+        
+        // Xử lý các trường đặc biệt như hình ảnh
+        if (columnName.toLowerCase().includes('image') || 
+            columnName.toLowerCase().includes('thumbnail') || 
+            columnName.toLowerCase().includes('icon')) {
+          cellValue = cellValue || 'No image';
+        }
+        
+        // Xử lý các trường trạng thái
+        if (columnName.toLowerCase().includes('status')) {
+          if (typeof cellValue === 'number') {
+            cellValue = cellValue === 1 ? 'Active' : 'Inactive';
+          }
+        }
+        
+        row[columnName] = cellValue;
       });
+      
       return row;
     });
+  };
+
+  // Xuất ra Excel
+  const exportToExcel = () => {
+    const exportData = prepareExportData();
+    const worksheet = utils.json_to_sheet(exportData);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, 'Data');
     
-    // Tạo CSV
+    // Điều chỉnh độ rộng cột
+    const columnWidths = columns
+      .filter(col => col.exportable !== false)
+      .map(col => ({ wch: Math.max(12, col.name?.toString().length || 0) }));
+    worksheet['!cols'] = columnWidths;
+    
+    writeFile(workbook, `${title || 'data'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // Xuất ra CSV
+  const exportToCSV = () => {
+    const exportData = prepareExportData();
+    const headers = columns
+      .filter(col => col.exportable !== false)
+      .map(col => col.name?.toString() || '');
+    
     const csvContent = [
-      exportColumns.map(col => col.name).join(','),
-      ...exportData.map(row => Object.values(row).join(','))
+      headers.join(','),
+      ...exportData.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Xử lý các giá trị có dấu phẩy
+          return typeof value === 'string' && value.includes(',') 
+            ? `"${value}"` 
+            : value;
+        }).join(',')
+      )
     ].join('\n');
     
-    // Tạo và tải file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `${title || 'data'}.csv`);
+    link.setAttribute('download', `${title || 'data'}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handleExportExcel = () => {
-    // Lọc bỏ cột action
-    const exportColumns = columns.filter(col => col.name !== 'Actions' && col.name !== 'Action');
+  // Xuất ra PDF
+  const exportToPDF = () => {
+    const exportData = prepareExportData();
+    const headers = columns
+      .filter(col => col.exportable !== false)
+      .map(col => col.name?.toString() || '');
     
-    // Chuẩn bị dữ liệu
-    const exportData = data.map(item => {
-      const row: Record<string, string> = {};
-      exportColumns.forEach(col => {
-        // Chuyển đổi giá trị thành string
-        const value = col.selector ? col.selector(item) : '';
-        row[col.name as string] = String(value || '');
-      });
-      return row;
-    });
-    
-    // Tạo workbook và worksheet
-    const wb = utils.book_new();
-    const ws = utils.json_to_sheet(exportData);
-    
-    // Thêm worksheet vào workbook
-    utils.book_append_sheet(wb, ws, 'Data');
-    
-    // Xuất file
-    writeFile(wb, `${title || 'data'}.xlsx`);
-  };
-
-  const handleExportPDF = () => {
-    // Lọc bỏ cột action
-    const exportColumns = columns.filter(col => col.name !== 'Actions' && col.name !== 'Action');
-    
-    // Chuẩn bị dữ liệu
-    const exportData = data.map(item => {
-      return exportColumns.map(col => {
-        // @ts-ignore
-        return col.selector ? col.selector(item) : '';
-      });
-    });
-    
-    // Tạo PDF
     const doc = new jsPDF();
+    
+    // Thêm tiêu đề
+    if (title) {
+      doc.text(title, 14, 15);
+      doc.setFontSize(12);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
+      doc.setFontSize(10);
+    }
+    
+    // Tạo bảng
     doc.autoTable({
-      head: [exportColumns.map(col => col.name)],
-      body: exportData,
+      head: [headers],
+      body: exportData.map(row => headers.map(header => row[header] || '')),
+      startY: title ? 30 : 15,
       theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [66, 139, 202], textColor: 255 }
     });
     
-    // Lưu file
-    doc.save(`${title || 'data'}.pdf`);
+    doc.save(`${title || 'data'}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  const handlePrint = () => {
-    if (!data || data.length === 0) return;
+  // Sao chép vào clipboard
+  const copyToClipboard = () => {
+    const exportData = prepareExportData();
+    const headers = columns
+      .filter(col => col.exportable !== false)
+      .map(col => col.name?.toString() || '');
     
-    // Create a printable version of the table
+    const textContent = [
+      headers.join('\t'),
+      ...exportData.map(row => 
+        headers.map(header => row[header] || '').join('\t')
+      )
+    ].join('\n');
+    
+    navigator.clipboard.writeText(textContent)
+      .then(() => alert('Data copied to clipboard'))
+      .catch(err => console.error('Failed to copy data: ', err));
+  };
+
+  // In dữ liệu
+  const printData = () => {
+    const exportData = prepareExportData();
+    const headers = columns
+      .filter(col => col.exportable !== false)
+      .map(col => col.name?.toString() || '');
+    
+    // Tạo một cửa sổ in mới
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     
-    const html = `
+    // Tạo HTML cho bảng
+    const tableHTML = `
       <html>
         <head>
-          <title>${title || 'Print'}</title>
+          <title>${title || 'Data'}</title>
           <style>
             body { font-family: Arial, sans-serif; }
-            table { width: 100%; border-collapse: collapse; }
+            table { border-collapse: collapse; width: 100%; }
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; }
-            h1 { text-align: center; }
+            h2 { margin-bottom: 10px; }
+            .date { margin-bottom: 20px; color: #666; }
           </style>
         </head>
         <body>
-          ${title ? `<h1>${title}</h1>` : ''}
+          ${title ? `<h2>${title}</h2>` : ''}
+          <div class="date">Generated on: ${new Date().toLocaleDateString()}</div>
           <table>
             <thead>
-              <tr>
-                ${columns.map(col => `<th>${col.name}</th>`).join('')}
-              </tr>
+              <tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr>
             </thead>
             <tbody>
-              ${data.map(item => `
+              ${exportData.map(row => `
                 <tr>
-                  ${columns.map(col => {
-                    const selector = typeof col.selector === 'function' ? col.selector(item) : (col.selector ? item[col.selector as keyof typeof item] : '');
-                    return `<td>${selector || ''}</td>`;
-                  }).join('')}
+                  ${headers.map(header => `<td>${row[header] || ''}</td>`).join('')}
                 </tr>
               `).join('')}
             </tbody>
@@ -210,122 +280,152 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     `;
     
     printWindow.document.open();
-    printWindow.document.write(html);
+    printWindow.document.write(tableHTML);
     printWindow.document.close();
-    printWindow.print();
+    
+    // Đợi tải xong tài nguyên rồi in
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
-  const handleCopy = () => {
-    if (!data || data.length === 0) return;
+  // Sửa lại phần xử lý responsive columns
+  const responsiveColumns = columns.map(column => {
+    // Tạo bản sao của column để tránh thay đổi trực tiếp
+    const newColumn = { ...column };
     
-    // Format data as tab-separated text
-    const headers = columns.map(col => col.name).join('\t');
-    const rows = data.map(item => 
-      columns.map(col => {
-        const selector = typeof col.selector === 'function' ? col.selector(item) : (col.selector ? item[col.selector as keyof typeof item] : '');
-        return selector || '';
-      }).join('\t')
-    ).join('\n');
+    // Xóa thuộc tính minWidth khỏi column để tránh lỗi
+    delete newColumn.minWidth;
     
-    const text = `${headers}\n${rows}`;
+    // Điều chỉnh width dựa trên kích thước màn hình
+    if (isMobile) {
+      newColumn.width = undefined;
+    }
     
-    // Copy to clipboard
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        alert('Data copied to clipboard');
-      })
-      .catch(err => {
-        console.error('Failed to copy: ', err);
-      });
-  };
+    return newColumn;
+  });
 
-  // Responsive columns for mobile
-  const responsiveColumns = isMobile 
-    ? columns.map(col => ({
-        ...col,
-        width: col.width ? undefined : 'auto', // Remove fixed widths on mobile
-        wrap: true,
-      }))
-    : columns;
-
-  // Custom styles
+  // Custom styles cho DataTable
   const customStyles = {
     table: {
       style: {
-        minWidth: '100%',
+        backgroundColor: '#ffffff',
       },
     },
     headRow: {
       style: {
         backgroundColor: '#f8f9fa',
         borderBottom: '2px solid #dee2e6',
-        fontWeight: 'bold',
+      },
+    },
+    headCells: {
+      style: {
+        fontWeight: '600',
+        color: '#495057',
+        fontSize: '0.875rem',
       },
     },
     rows: {
       style: {
-        minHeight: '50px',
-        fontSize: isMobile ? '0.875rem' : '1rem',
+        minHeight: '48px',
+        fontSize: '0.875rem',
+        borderBottom: '1px solid #dee2e6',
         '&:hover': {
-          backgroundColor: 'rgba(0, 0, 0, 0.03)',
+          backgroundColor: '#f8f9fa',
         },
       },
     },
     pagination: {
       style: {
         borderTop: '1px solid #dee2e6',
-        padding: '1rem 0',
+        fontSize: '0.875rem',
       },
     },
   };
 
-  // Search and export buttons
+  // SubHeader component với search và export buttons
   const subHeaderComponent = (
-    <div className={`d-flex ${isMobile ? 'flex-column w-100' : 'flex-row align-items-center justify-content-between'} gap-2 mb-3`}>
-      <InputGroup className={isMobile ? 'mb-2 w-100' : 'w-auto'}>
-        <Form.Control
-          type="text"
-          placeholder="Search..."
-          value={filterText}
-          onChange={e => setFilterText(e.target.value)}
-        />
-        {filterText && (
-          <Button variant="outline-secondary" onClick={handleClear}>
-            <i className="fas fa-times"></i>
-          </Button>
-        )}
-      </InputGroup>
+    <div className="d-flex flex-wrap justify-content-between align-items-center w-100 mb-3">
+      <div className="mb-2 mb-md-0">
+        <InputGroup>
+          <InputGroup.Text>
+            <i className="fas fa-search"></i>
+          </InputGroup.Text>
+          <Form.Control
+            type="text"
+            placeholder="Search..."
+            value={filterText}
+            onChange={e => setFilterText(e.target.value)}
+          />
+          {filterText && (
+            <Button 
+              variant="outline-secondary" 
+              onClick={() => {
+                setFilterText('');
+                setResetPaginationToggle(!resetPaginationToggle);
+              }}
+            >
+              <i className="fas fa-times"></i>
+            </Button>
+          )}
+        </InputGroup>
+      </div>
       
-      {Object.values(buttons).some(v => v) && (
-        <div className={`d-flex ${isMobile ? 'flex-wrap w-100' : 'flex-row'} gap-2`}>
+      {Object.values(buttons).some(Boolean) && (
+        <div className="d-flex flex-wrap gap-2">
           {buttons.copy && (
-            <Button variant="outline-secondary" size={isMobile ? 'sm' : undefined} onClick={handleCopy} className="d-flex align-items-center">
+            <Button 
+              variant="outline-secondary" 
+              size="sm"
+              onClick={copyToClipboard}
+              title="Copy to clipboard"
+            >
               <i className="fas fa-copy me-1"></i>
-              <span>Copy</span>
+              {!isMobile && 'Copy'}
             </Button>
           )}
           {buttons.csv && (
-            <Button variant="outline-secondary" size={isMobile ? 'sm' : undefined} onClick={exportToCSV} className="d-flex align-items-center">
+            <Button 
+              variant="outline-secondary" 
+              size="sm"
+              onClick={exportToCSV}
+              title="Export as CSV"
+            >
               <i className="fas fa-file-csv me-1"></i>
-              <span>CSV</span>
+              {!isMobile && 'CSV'}
             </Button>
           )}
           {buttons.excel && (
-            <Button variant="outline-secondary" size={isMobile ? 'sm' : undefined} onClick={handleExportExcel} className="d-flex align-items-center">
+            <Button 
+              variant="outline-secondary" 
+              size="sm"
+              onClick={exportToExcel}
+              title="Export as Excel"
+            >
               <i className="fas fa-file-excel me-1"></i>
-              <span>Excel</span>
+              {!isMobile && 'Excel'}
             </Button>
           )}
           {buttons.pdf && (
-            <Button variant="outline-secondary" size={isMobile ? 'sm' : undefined} onClick={handleExportPDF} className="d-flex align-items-center">
+            <Button 
+              variant="outline-secondary" 
+              size="sm"
+              onClick={exportToPDF}
+              title="Export as PDF"
+            >
               <i className="fas fa-file-pdf me-1"></i>
-              <span>PDF</span>
+              {!isMobile && 'PDF'}
             </Button>
           )}
           {buttons.print && (
-            <Button variant="outline-secondary" size={isMobile ? 'sm' : undefined} onClick={handlePrint} className="d-flex align-items-center">
+            <Button 
+              variant="outline-secondary" 
+              size="sm"
+              onClick={printData}
+              title="Print"
+            >
               <i className="fas fa-print me-1"></i>
-              <span>Print</span>
+              {!isMobile && 'Print'}
             </Button>
           )}
         </div>

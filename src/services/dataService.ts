@@ -337,6 +337,20 @@ class DataService {
     
     return this.apiCall(API_ENDPOINTS.game(id), { method: 'DELETE' });
   }
+
+  async updateError(id: number, data: any) {
+    return this.apiCall(API_ENDPOINTS.error(id), {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+  
+  async createError(data: any) {
+    return this.apiCall(API_ENDPOINTS.errors, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const dataService = new DataService(); 

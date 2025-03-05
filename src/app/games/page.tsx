@@ -60,14 +60,26 @@ export default function GamesPage() {
     },
     {
       name: 'Thumbnail',
-      cell: (row: Game) => (
-        <img 
-          src={row.game_thumbnail || '/placeholder.jpg'} 
-          alt={row.name}
-          style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }}
-        />
-      ),
+      cell: (row: Game) => {
+        if (!row.game_thumbnail) {
+          return <div style={{ width: '50px', height: '50px' }}></div>;
+        }
+        
+        return (
+          <img 
+            src={row.game_thumbnail} 
+            alt={row.name}
+            style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        );
+      },
       width: '100px',
+      exportable: true,
+      exportTransform: (value: string) => value ? 'Has thumbnail' : 'No thumbnail',
+      selector: (row: Game) => row.game_thumbnail
     },
     {
       name: 'Name',
