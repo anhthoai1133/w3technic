@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Button, Form, Row, Col } from 'react-bootstrap';
 import { dataService } from '@/services/dataService';
 import type { Website, Category } from '@/types/website';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface WebsiteModalProps {
   show: boolean;
@@ -59,10 +60,17 @@ export default function WebsiteModal({
 
   const fetchCategories = async () => {
     try {
-      const data = await dataService.getCategories();
+      const response = await fetch(API_ENDPOINTS.categories);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
       setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      setCategories([]);
     }
   };
 

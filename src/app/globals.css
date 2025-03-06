@@ -534,7 +534,7 @@ img {
 .main-content {
   margin-left: var(--sidebar-width);
   padding: 1rem;
-  margin-top: var(--header-height);
+  /* margin-top: var(--header-height); */
   min-height: calc(100vh - var(--header-height));
 }
 
@@ -843,4 +843,19 @@ img {
 
 .sidebar.desktop.hidden {
   transform: translateX(-100%);
+}
+
+/* Ngăn nhấp nháy khi chuyển trang */
+html.route-changed .sidebar,
+html.route-changed .main-content {
+  transition: none !important;
+}
+
+/* Tối ưu hóa hiệu suất */
+.sidebar {
+  will-change: transform;
+}
+
+.main-content {
+  will-change: margin-left;
 }

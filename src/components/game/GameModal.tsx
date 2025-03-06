@@ -93,7 +93,10 @@ export default function GameModal({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
     
     // Tự động tạo URL thumbnail dựa trên tên game
     if (name === 'name') {
@@ -146,7 +149,7 @@ export default function GameModal({
                 <Form.Control
                   type="text"
                   name="name"
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={handleChange}
                   required
                 />
@@ -160,7 +163,7 @@ export default function GameModal({
                 <Form.Label>Category</Form.Label>
                 <Form.Select
                   name="category_id"
-                  value={formData.category_id}
+                  value={formData.category_id || ''}
                   onChange={handleChange}
                   required
                 >
@@ -185,7 +188,7 @@ export default function GameModal({
                 <Form.Control
                   type="url"
                   name="gameplay_url"
-                  value={formData.gameplay_url}
+                  value={formData.gameplay_url || ''}
                   onChange={handleChange}
                   required
                 />
@@ -199,7 +202,7 @@ export default function GameModal({
                 <Form.Label>Status</Form.Label>
                 <Form.Select
                   name="status"
-                  value={formData.status}
+                  value={formData.status || 1}
                   onChange={handleChange}
                   required
                 >
@@ -217,7 +220,7 @@ export default function GameModal({
                 <Form.Control
                   type="url"
                   name="game_thumbnail"
-                  value={formData.game_thumbnail}
+                  value={formData.game_thumbnail || ''}
                   onChange={handleChange}
                 />
               </Form.Group>
@@ -241,7 +244,7 @@ export default function GameModal({
               as="textarea"
               rows={3}
               name="game_desc"
-              value={formData.game_desc}
+              value={formData.game_desc || ''}
               onChange={handleChange}
             />
           </Form.Group>
@@ -252,7 +255,7 @@ export default function GameModal({
               as="textarea"
               rows={3}
               name="game_instruction"
-              value={formData.game_instruction}
+              value={formData.game_instruction || ''}
               onChange={handleChange}
             />
           </Form.Group>
@@ -264,7 +267,7 @@ export default function GameModal({
                 <Form.Control
                   type="text"
                   name="developer"
-                  value={formData.developer}
+                  value={formData.developer || ''}
                   onChange={handleChange}
                 />
               </Form.Group>
@@ -275,7 +278,7 @@ export default function GameModal({
                 <Form.Control
                   type="number"
                   name="published_year"
-                  value={formData.published_year}
+                  value={formData.published_year || new Date().getFullYear()}
                   onChange={handleChange}
                 />
               </Form.Group>
@@ -287,7 +290,7 @@ export default function GameModal({
             <Form.Control
               type="text"
               name="meta_title"
-              value={formData.meta_title}
+              value={formData.meta_title || ''}
               onChange={handleChange}
             />
           </Form.Group>
@@ -298,7 +301,7 @@ export default function GameModal({
               as="textarea"
               rows={2}
               name="meta_desc"
-              value={formData.meta_desc}
+              value={formData.meta_desc || ''}
               onChange={handleChange}
             />
           </Form.Group>

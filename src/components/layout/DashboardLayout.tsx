@@ -21,7 +21,9 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
   // Khôi phục trạng thái desktop sidebar từ localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedDesktopState = localStorage.getItem('desktopSidebarOpen');
+      // Ưu tiên sử dụng trạng thái từ sessionStorage nếu có
+      const tempState = sessionStorage.getItem('__sidebar_state');
+      const savedDesktopState = tempState || localStorage.getItem('desktopSidebarOpen');
       const isMobileView = window.innerWidth < 768;
       
       // Đặt trạng thái mobile trước
@@ -33,6 +35,9 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
           setDesktopSidebarOpen(savedDesktopState === 'true');
         }
       }
+      
+      // Xóa trạng thái tạm thời
+      sessionStorage.removeItem('__sidebar_state');
       
       // Đánh dấu đã khởi tạo
       setIsInitialized(true);
